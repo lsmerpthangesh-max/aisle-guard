@@ -1,5 +1,5 @@
-opencv-python
-pyyaml
-ultralytics
 streamlit
+ultralytics
+pyyaml
 pillow
+opencv-python-headless==4.10.0.84
