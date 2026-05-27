@@ -143,10 +143,13 @@ def main():
         frame_id += 1
         ring_buffer.add(frame)
 
-        # run detection every N frames
+        # Run detection every N frames
         if sampler.should_process():
             last_tracks = tracker.track(frame, frame_id)
-            last_poses = pose_estimator.estimate(frame) if ENABLE_POSE else []
+
+            last_poses = []
+            if ENABLE_POSE:
+                last_poses = pose_estimator.estimate(frame)
 
             for track in last_tracks:
                 x1, y1, x2, y2 = track["bbox"]
@@ -173,7 +176,7 @@ def main():
                         risk_score=risk
                     )
 
-        # draw overlays
+        # Draw results
         draw_tracks(frame, last_tracks)
 
         if ENABLE_POSE:
