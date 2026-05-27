@@ -1,4 +1,6 @@
 import cv2
+import streamlit as st
+
 from detector.stream import VideoStream
 from detector.sampler import FrameSampler
 from detector.tracker import PersonTracker
@@ -8,8 +10,8 @@ from detector.event_logger import EventLogger
 from detector.pose import PoseEstimator
 
 
+# ---------------- CONFIG ----------------
 MODE = "video"
-
 VIDEO_PATH = "videos/input2.mp4"
 
 FPS = 30
@@ -31,6 +33,7 @@ CART_ZONE = {
 }
 
 
+# ---------------- UTILS ----------------
 def point_in_zone(cx, cy, zone):
     return (
         zone["x1"] <= cx <= zone["x2"] and
@@ -47,12 +50,12 @@ def draw_tracks(frame, tracks):
         if state == "RISK":
             color = (0, 0, 255)
             label = f"RISK {risk:.2f}"
-            font_scale = 1.3
+            font_scale = 1.2
             thickness = 3
         else:
             color = (0, 255, 0)
             label = "SAFE"
-            font_scale = 0.9
+            font_scale = 0.8
             thickness = 2
 
         cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness)
@@ -65,21 +68,6 @@ def draw_tracks(frame, tracks):
             color,
             thickness
         )
-
-
-def print_debug_tracks(tracks):
-    print("\n--- TRACK DEBUG ---")
-    for track in tracks:
-        track_id = track["track_id"]
-        center = track["center"]
-        history = track["history"]
-
-        print(f"Person ID: {track_id}")
-        print(f"  Current center: {center}")
-        print(f"  History length: {len(history)}")
-
-        for h in history[-5:]:
-            print(f"    Frame {h['frame_id']} -> Center {h['center']}")
 
 
 POSE_CONNECTIONS = [
@@ -95,6 +83,7 @@ POSE_CONNECTIONS = [
 
 def draw_pose(frame, keypoints):
     for idx, (x, y) in enumerate(keypoints):
+        color = (0, 255, 0)
         if idx in [0, 1, 2, 3, 4]:
             color = (255, 255, 0)
         elif idx in [5, 6, 7, 8, 9, 10]:
@@ -102,20 +91,22 @@ def draw_pose(frame, keypoints):
         else:
             color = (0, 0, 255)
 
-        cv2.circle(frame, (int(x), int(y)), 4, color, -1)
+        cv2.circle(frame, (int(x), int(y)), 3, color, -1)
 
     for i, j in POSE_CONNECTIONS:
         x1, y1 = keypoints[i]
         x2, y2 = keypoints[j]
-        cv2.line(
-            frame,
-            (int(x1), int(y1)),
-            (int(x2), int(y2)),
-            (0, 255, 255),
-            2
-        )
+        cv2.line(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 255), 2)
 
 
+# ---------------- STREAMLIT UI ----------------
+st.set_page_config(page_title="Aisle Guard", layout="wide")
+st.title("🛒 Aisle Guard - Shoplifting Detection System")
+
+stframe = st.empty()
+
+
+# ---------------- MAIN ----------------
 def main():
     if MODE == "video":
         source = VIDEO_PATH
@@ -152,19 +143,10 @@ def main():
         frame_id += 1
         ring_buffer.add(frame)
 
-        if frame_id % 100 == 0:
-            print(
-                f"Ring buffer frames: "
-                f"{len(ring_buffer.get_frames())} / {ring_buffer.max_frames}"
-            )
-
+        # run detection every N frames
         if sampler.should_process():
             last_tracks = tracker.track(frame, frame_id)
-            print_debug_tracks(last_tracks)
-
-            last_poses = []
-            if ENABLE_POSE:
-                last_poses = pose_estimator.estimate(frame)
+            last_poses = pose_estimator.estimate(frame) if ENABLE_POSE else []
 
             for track in last_tracks:
                 x1, y1, x2, y2 = track["bbox"]
@@ -191,18 +173,15 @@ def main():
                         risk_score=risk
                     )
 
+        # draw overlays
         draw_tracks(frame, last_tracks)
 
         if ENABLE_POSE:
             for pose in last_poses:
                 draw_pose(frame, pose)
 
-        cv2.imshow("Aisle Guard", frame)
-
-        if cv2.waitKey(1) & 0xFF == ord("q"):
-            break
-
-    cv2.destroyAllWindows()
+        # ---------------- STREAMLIT DISPLAY ----------------
+        stframe.image(frame, channels="BGR")
 
 
 if __name__ == "__main__":
