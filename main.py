@@ -10,7 +10,7 @@ from detector.pose import PoseEstimator
 
 MODE = "video"
 
-VIDEO_PATH = "input2.mp4"
+VIDEO_PATH = "videos/input2.mp4"
 
 FPS = 30
 BUFFER_SECONDS = 15
